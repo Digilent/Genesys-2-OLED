@@ -73,7 +73,7 @@ localparam ActiveToggleDispWait = 8'h26;
 localparam ActiveWrite          = 8'h27;
 localparam ActiveWriteTran      = 8'h28;
 localparam ActiveWriteWait      = 8'h29;
-//Bringdown STATES
+//BRINGDOWN STATES
 localparam BringdownDispOff     = 8'h30;
 localparam BringdownVbatOff     = 8'h31;
 localparam BringdownDelay       = 8'h32;
@@ -167,40 +167,28 @@ assign pbuf_write_en = (state == ActiveWrite) ? 1'b1 : 1'b0;
 assign pbuf_write_addr = temp_write_base_addr + write_byte_count;
 
 //read only memory for character bitmaps
-block_rom #(
-    .DATA_WIDTH (8),
-    .ADDR_WIDTH (10),
-    .FILENAME   ("charLib.dat")
-) CHAR_LIB_COMP (
-    .clk        (clk),
-    .addr       (char_lib_addr),
-    .dout       (pbuf_write_data)
+charLib CHAR_LIB (
+    .clka(clk),
+    .addra(char_lib_addr),
+    .douta(pbuf_write_data)
 );
 
 //pixel buffer
-block_ram #(
-    .DATA_WIDTH     (8),
-    .ADDR_WIDTH     (9),
-    .INIT_FROM_FILE ("false"),
-    .INIT_FILENAME  ()
-) BYTE_BUFFER (
-    .clk            (clk),
-    .write_en       (pbuf_write_en),
-    .write_addr     (pbuf_write_addr),
-    .write_data     (pbuf_write_data),
-    .read_addr      (pbuf_read_addr),
-    .read_data      (pbuf_read_data)
+pixel_buffer PIXEL_BUFFER (
+    .clka  (clk),
+    .wea   (pbuf_write_en),
+    .addra (pbuf_write_addr),
+    .dina  (pbuf_write_data),
+    .clkb  (clk),
+    .addrb (pbuf_read_addr),
+    .doutb (pbuf_read_data)
 );
 
 //initialization sequence op code look up
-block_rom #(
-    .DATA_WIDTH(16),
-    .ADDR_WIDTH(4),
-    .FILENAME("init_sequence.dat")
-) init_sequence (
-    .clk(clk),
-    .addr(startup_count),
-    .dout(init_operation)
+init_sequence_rom INIT_SEQ (
+    .clka(clk),
+    .addra(startup_count),
+    .douta(init_operation)
 );
 
 //handshake flags, ready means associated start will be accepted

@@ -47,29 +47,28 @@ module top(
     localparam str1=" I am the OLED  ", str1len=16;
     localparam str2=" Display Demo   ", str2len=16;
     localparam str3=" for Digilent's ", str3len=16;
-    localparam str4=" Genesys2       ", str4len=16;
+    localparam str4=" Genesys 2      ", str4len=16;
     
-	wire clk200M;
-	reg clk=0;
+    localparam AUTO_START = 1; // determines whether the OLED will be automatically initialized when the board is programmed
+    
+	wire clk;
 	
     //state machine registers.
-    reg [2:0] state = Idle;
+    reg [2:0] state = (AUTO_START == 1) ? Init : Idle;
     reg [5:0] count = 0;//loop index variable
     reg       once = 0;//bool to see if we have set up local pixel memory in this session
         
     //oled control signals
     //command start signals, assert high to start command
     reg        update_start = 0;        //update oled display over spi
-    reg        disp_on_start = 0;       //turn the oled display on
+    reg        disp_on_start = AUTO_START;       //turn the oled display on
     reg        disp_off_start = 0;      //turn the oled display off
     reg        toggle_disp_start = 0;   //turns on every pixel on the oled, or returns the display to before each pixel was turned on
     reg        write_start = 0;         //writes a character bitmap into local memory
-    
     //data signals for oled controls
     reg        update_clear = 0;        //when asserted high, an update command clears the display, instead of filling from memory
     reg  [8:0] write_base_addr = 0;     //location to write character to, two most significant bits are row position, 0 is topmost. bottom seven bits are X position, addressed by pixel x position.
     reg  [7:0] write_ascii_data = 0;    //ascii value of character to write to memory
-    
     //active high command ready signals, appropriate start commands are ignored when these are not asserted high
     wire       disp_on_ready;
     wire       disp_off_ready;
@@ -84,19 +83,14 @@ module top(
     wire       dBtnD;   // Bottom DPad Button tied to update with clear
     
 	//create a 100MHz clock signal from 200MHz differential input.
-	IBUFGDS #(
-		.DIFF_TERM    ("FALSE"),
-		.IBUF_LOW_PWR ("TRUE"),
-		.IOSTANDARD   ("LVDS")
-	) get_clk (
-		.O  (clk200M),
-		.I  (clk_p),
-		.IB (clk_n)
-	);
-	always@(posedge clk200M) clk <= ~clk;
+	clk_wiz_0 getCLK (
+        .clk_in1_n (clk_n),
+        .clk_in1_p (clk_p),
+        .clk_out1  (clk)
+    );
 	
 	//instantiate OLED controller
-    OLEDCtrl uut (
+    OLEDCtrl m_OLEDCtrl (
         .clk                (clk),              
         .write_start        (write_start),      
         .write_ascii_data   (write_ascii_data), 
@@ -162,7 +156,7 @@ module top(
         .B(rst)
     );
     
-    assign led = update_ready;//display whether btnU, BtnD controls are available.
+    assign led = update_ready;//display whether btnU, BtnD controls are available..
     assign init_done = disp_off_ready | toggle_disp_ready | write_ready | update_ready;//parse ready signals for clarity
     assign init_ready = disp_on_ready;
     always@(posedge clk)
@@ -186,7 +180,6 @@ module top(
                 end else if (once == 0 && write_ready) begin
                     write_start <= 1'b1;
                     write_base_addr <= 'b0;
-//                    write_ascii_data <= 8'd65;
                     state <= WriteWait;
                 end else if (once == 1 && dBtnU == 1) begin
                     update_start <= 1'b1;
